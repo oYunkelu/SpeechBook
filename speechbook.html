@@ -1,0 +1,210 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>桃太郎の絵本読み聞かせ</title>
+    <!--
+      イヤホンをして作成したためイヤホンであれば正常に動きますが、イヤホンなしだと
+      音読した言葉をマイクが認識してしまうため何度も再生されてしまいます。
+      「めくって」と指示した後マイク画像をオフにをしていただくと上手く進むと思います。
+      Startボタンを押すと「はじまりはじまり~」と絵本の読み聞かせが開始されます。
+    マイクボタンを押して「めっくって」または「もどって」と言うとページ移動の操作ができます。
+  　　Startボタンとマイクボタンは一度押しておけば、「めくって」「もどって」の合図で
+　　ページが変わり絵本のページに添った内容の音読が開始されます。
+    -->
+  </head>
+  <style>
+    h1 {
+      color: hotpink;
+      text-align: center;
+      /*margin-left: 200px;*/
+    }
+    .center {
+      /*display: flex;
+      float: left;*/
+      text-align: center;
+      padding-left: 50px;
+    }
+    .center-box {
+      display: inline-block;
+      /*text-align: center;*/
+      /*margin-left: 200px;*/
+    }
+    #speak {
+      /*text-align: center;*/
+      display: inline-block;
+      background-color: pink;
+      /*color: white;*/
+      font-size: 40px;
+      margin-bottom: 200px;
+      margin-right: 50px;
+    }
+    .img img {
+      display: block;
+      margin: auto;
+    }
+    #momotaro {
+      text-align: center;
+      margin: 0 auto;
+    }
+    .large-text {
+      font-size: 20px; /*4rem*/
+      color: white;
+    }
+  </style>
+  <body>
+    <!--<h1>絵本よみきかせ</h1>-->
+    <div class="img">
+      <img id="momotaro" src="momotaro0.JPG" width="900px" height="700px" />
+    </div>
+    <div class="center">
+      <button id="speak">Start</button>
+      <p class="center-box">
+        <img id="mic" src="micoff.svg" width="80px" height="80px" />
+      </p>
+    </div>
+    <div id="result-div" class="large-text"></div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="googleSheets.js"></script>
+
+    <script>
+      const resultDiv = document.querySelector("#result-div");
+      const micDiv = document.querySelector("#mic");
+      //const mic1Div = document.querySelector("#mic1");
+      // img要素を取得する
+      var img = document.getElementById("momotaro");
+      // 表示する画像番号
+      var idx = 0;
+      let i = 0;
+      let speakingtime = 0;
+
+      let text1;
+      let data;
+
+      $(function () {
+        /* global $ loadSheets */
+        const sheetId = "1RzStBJlpzVjYfwXW79X_d8_Od1t5Z6dyonjDAYH5I7E";
+        const range = "sheet1!A1:E100";
+        //const max = 3;
+
+        $("#speak").on("click", showdata);
+        async function showdata() {
+          data = await loadSheets(sheetId, range);
+          //i = idx;
+          text1 = data.values[0][1]; //[][]縦列・横列
+          speak(text1);
+        }
+      });
+
+      // 音声認識機能(Chrome)
+      let rec = new webkitSpeechRecognition();
+      let stopped = true;
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.lang = "ja-JP";
+
+      micDiv.onclick = function () {
+        if (stopped == true) {
+          stopped = false;
+          resultDiv.innerHTML = "";
+          rec.start();
+        } else {
+          stopped = true;
+          rec.stop();
+        }
+      };
+
+      rec.onstart = function () {
+        console.log("on start");
+        micDiv.setAttribute("src", "micon.svg");
+        speakingtime = 0;
+      };
+
+      rec.onend = function () {
+        console.log("on end");
+        micDiv.setAttribute("src", "micoff.svg");
+        if (stopped == false) {
+          setTimeout(function () {
+            rec.start();
+          }, speakingtime);
+        }
+      };
+
+      rec.onresult = function (e) {
+        rec.stop();
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            console.log(e);
+            let text = e.results[i][0].transcript;
+            resultDiv.innerHTML = text;
+            console.log(text);
+            if (text == "めくって") {
+              text = "はーい";
+              //mic1Div.setAttribute("src", "sana.jpeg");
+              idx++;
+              if (idx > 6) {
+                idx = 6;
+              }
+              img.src = "momotaro" + idx + ".JPG";
+            } else if (text == "戻って") {
+              //「もどって」はバツ
+              text = "もどるね";
+              //mic1Div.setAttribute("src", "sana8.jpg");
+              idx = idx - 1;
+              if (idx < 0) {
+                idx = 0;
+              }
+              img.src = "momotaro" + idx + ".JPG";
+            } else {
+              text == "";
+              //console.log("ok");
+            }
+            i = idx;
+            text1 = data.values[i][1];
+            console.log(text1);
+            speakingtime = text.length * 200;
+            console.log("estimate:", speakingtime, "ms");
+            speak(text1);
+          }
+        }
+      };
+
+      // 発話機能をインスタンス化
+      let msg = new SpeechSynthesisUtterance();
+      let voices = window.speechSynthesis.getVoices();
+
+      function speak(text) {
+        msg.volume = 1.0; // 音量 min 0 ~ max 1
+        msg.rate = 1.0; // 速度 min 0 ~ max 10
+        msg.pitch = 1.0; // 音程 min 0 ~ max 2
+
+        msg.text = text; // 喋る内容
+        msg.lang = "ja-JP"; // en-US or ja-JP
+        //msg.lang = "en-US"; // en-US or ja-JP
+        // 発話実行
+        speechSynthesis.speak(msg);
+      }
+
+      // 終了時の処理
+      msg.onend = function (event) {
+        console.log("喋った時間：" + event.elapsedTime + "ms");
+      };
+
+      /*let text1;
+      async function showdata() {
+        let data = await loadSheets(sheetId, range);
+        //console.log(data.values[0][0]);
+        text1 = data.values[1][1];
+        console.log(data.values[1][1]);
+      }*/
+    </script>
+
+    <script
+      async
+      defer
+      src="https://apis.google.com/js/api.js"
+      onload="handleClientLoad()"
+      onreadystatechange="if (this.readyState === 'complete') this.onload()"
+    ></script>
+  </body>
+</html>
